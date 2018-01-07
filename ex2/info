@@ -1,0 +1,83 @@
+> ZAD 1 - przesłanie obrazów potokiem
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#define BUF_SIZE 128000
+
+int main(int argc, char * argv[]) {
+        int potok_fd[2], r;
+        char bufor[BUF_SIZE];
+        pipe(potok_fd);
+        int pid = fork();
+
+        int fd=open(argv[1], O_RDONLY);
+
+
+        if(pid == -1){
+                exit(0);
+        }
+        if (pid == 0) {
+                close(0);
+                dup(potok_fd[0]);
+
+                close(potok_fd[1]); 
+                close(potok_fd[0]);
+
+                execlp("display","display", (char *) NULL);
+                close(1);
+                exit(0);
+        }else{
+                close(1);
+                while ((r=read(fd, bufor, BUF_SIZE)) > 0)
+                        write(potok_fd[1], bufor, r);
+        }
+}
+
+Napisany program dla ułatwienia korzysta z argv, który po wpisaniu jako pierwszego parametru pliku obrazu, "przepisze" go następnie w potoku. Obraz wyświetlany jest za pomocą programu display.
+pid == 0 ~proces dziecka
+pid == -1 ~błąd
+pid != 0 && != -1 (czyli ==1), bądź po prostu else ~proces rodzica
+
+>ZAD 2 - modyfikacja programu z zadania 1 (fifo)
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#define BUF_SIZE 128000
+
+int main(int argc, char * argv[]) {
+        int r;
+        char bufor[BUF_SIZE];
+        int pid = fork();
+
+        
+        if(pid == -1){
+                exit(0);
+        }
+        if (pid == 0) {
+                execlp("tail","tail","-f","FIFO1",(char *) NULL);
+                exit(0);
+        }else{
+                int fifofd = mknod("FIFO1",O_WRONLY, 0666);
+                int fd=open(argv[1], O_RDONLY);
+
+                while ((r=read(fd, bufor, BUF_SIZE)) > 0)
+                        write(fifofd, bufor, r);
+                close(fifofd);
+        }
+}
+
+Zadanie drugie polegało na modyfikacji programu z zadania pierwszego. Tworzymy teraz programowo "fifo" funkcją mknod o nazwie "FIFO1", następnie analogicznie jak w programie pierwszym odczytujemy plik (tym razem tekstowy) z argv, przepisujemy i końcowo wyświetlamy zawartość w dziecku przy pomocy funkcji execlp i programu linuxowego "tail" z flagą -f.
+
+// KOMENTARZE DO ZADAŃ:
+
+        - oba zadania zostały napisane bez oczekiwania na wpisanie plików przez użytkownika (zostały użyte parametry programu) dla ulepszenia czytelności programów i ułatwienia ich obsługi. Oczywiście można zrobić zadanie również na chociażby scanf(wejście_użytkownika), jednak ograniczyłem się do tej najbardziej przejrzystej i obecnej wersji.
